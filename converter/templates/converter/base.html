@@ -1,0 +1,46 @@
+<!-- base.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SonusShare{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'converter/css/base.css' %}">
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+    <header>
+        <nav class="nav-left">
+            <ul>
+                <li><a href="{% url 'index' %}">Home</a></li>
+                <li><a href="{% url 'about' %}">About</a></li>
+            </ul>
+        </nav>
+        
+        <div class="logo-container">
+            <h1>SonusShare</h1>
+        </div>
+        
+        <nav class="nav-right">
+            <ul>
+                <li><a href="{% url 'contact' %}">Contact</a></li>
+                <li><a href="#">Support</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}
+          <div class="error-container">
+            <h2>Oops! An error occurred.</h2>
+            <p>{{ error_message }}</p>
+            <a href="{% url 'index' %}">Go back to the home page</a>
+          </div>
+        {% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

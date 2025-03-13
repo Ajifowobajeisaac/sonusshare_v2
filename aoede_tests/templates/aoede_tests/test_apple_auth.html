@@ -1,0 +1,355 @@
+{% extends 'converter/base.html' %}
+{% load static %}
+
+{% block title %}Aoede - Apple Music Authorization Test{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'aoede_tests/css/test_center.css' %}">
+<style>
+    .auth-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 4rem 2rem;
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 4rem;
+    }
+
+    .auth-header h1 {
+        font-size: 2.5rem;
+        font-weight: normal;
+        color: #333;
+        margin-bottom: 1rem;
+    }
+
+    .auth-header p {
+        font-size: 1.1rem;
+        color: #666;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .auth-section {
+        background: white;
+        border: 2px solid #333;
+        margin-bottom: 2rem;
+        padding: 2rem;
+    }
+
+    .auth-section h2 {
+        font-size: 1.2rem;
+        font-weight: normal;
+        color: #333;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .status-display {
+        display: grid;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .status-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: rgba(0, 0, 0, 0.02);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .status-label {
+        font-size: 0.9rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .status-value {
+        font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+        font-size: 0.9rem;
+        color: #333;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .auth-button {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9rem;
+        background: #FA243C;
+        color: white;
+        border: 2px solid #FA243C;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .auth-button:hover:not(:disabled) {
+        background: white;
+        color: #FA243C;
+    }
+
+    .auth-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .secondary-button {
+        background: white;
+        color: #333;
+        border-color: #333;
+    }
+
+    .secondary-button:hover:not(:disabled) {
+        background: #333;
+        color: white;
+    }
+
+    .log-container {
+        margin-top: 2rem;
+        font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+        font-size: 0.9rem;
+    }
+
+    .log-entry {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-radius: 4px;
+    }
+
+    .log-entry:last-child {
+        margin-bottom: 0;
+    }
+
+    .log-info {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        color: rgb(59, 130, 246);
+    }
+
+    .log-success {
+        background: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.2);
+        color: rgb(34, 197, 94);
+    }
+
+    .log-error {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        color: rgb(239, 68, 68);
+    }
+
+    .log-details {
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 2px;
+        white-space: pre-wrap;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.8s linear infinite;
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-header">
+        <h1>Apple Music Authorization Test</h1>
+        <p>Test and validate Apple Music's MusicKit authorization flow and token management</p>
+    </div>
+
+    <div class="auth-section">
+        <h2>Authorization Status</h2>
+        <div class="status-display">
+            <div class="status-item">
+                <span class="status-label">Status</span>
+                <span id="status-badge" class="status-value">Not Authorized</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">User Token</span>
+                <span id="user-token-status" class="status-value">None</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Storefront ID</span>
+                <span id="storefront-id" class="status-value">N/A</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Last Updated</span>
+                <span id="last-updated" class="status-value">Never</span>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="auth-button" class="auth-button">
+                Authorize Apple Music
+            </button>
+            <button id="revoke-button" class="auth-button secondary-button" disabled>
+                Revoke Access
+            </button>
+        </div>
+    </div>
+
+    <div class="auth-section">
+        <h2>Test Results</h2>
+        <div id="log-container" class="log-container"></div>
+    </div>
+</div>
+
+<script>
+    let music = null;
+    let userToken = null;
+
+    const addLog = (message, type = 'info', details = null) => {
+        const container = document.getElementById('log-container');
+        const logDiv = document.createElement('div');
+        logDiv.className = `log-entry log-${type}`;
+        logDiv.textContent = message;
+        
+        if (details) {
+            const detailDiv = document.createElement('div');
+            detailDiv.className = 'log-details';
+            detailDiv.textContent = typeof details === 'object' ? 
+                JSON.stringify(details, null, 2) : details;
+            logDiv.appendChild(detailDiv);
+        }
+        
+        container.insertBefore(logDiv, container.firstChild);
+        console.log(`[${type}] ${message}`, details || '');
+    };
+
+    const updateStatus = (isAuthorized, details = {}) => {
+        const statusBadge = document.getElementById('status-badge');
+        const authButton = document.getElementById('auth-button');
+        const revokeButton = document.getElementById('revoke-button');
+        const lastUpdated = document.getElementById('last-updated');
+
+        if (isAuthorized) {
+            statusBadge.textContent = 'Authorized';
+            statusBadge.style.color = 'rgb(34, 197, 94)';
+            authButton.disabled = true;
+            revokeButton.disabled = false;
+        } else {
+            statusBadge.textContent = 'Not Authorized';
+            statusBadge.style.color = '#666';
+            authButton.disabled = false;
+            revokeButton.disabled = true;
+        }
+
+        document.getElementById('user-token-status').textContent = 
+            details.userToken ? `${details.userToken.substring(0, 10)}...` : 'None';
+        document.getElementById('storefront-id').textContent = 
+            details.storefrontId || 'N/A';
+        lastUpdated.textContent = new Date().toLocaleTimeString();
+    };
+
+    async function initializeMusicKit() {
+        try {
+            addLog('Initializing MusicKit...', 'info');
+
+            music = await MusicKit.configure({
+                developerToken: '{{ developer_token }}',
+                app: {
+                    name: 'SonusShare',
+                    build: '1.0.0'
+                }
+            });
+
+            addLog('MusicKit initialized successfully', 'success', {
+                version: music.version,
+                storefrontId: music.storefrontId
+            });
+
+            music.addEventListener(MusicKit.Events.authorizationStatusDidChange, handleAuthChange);
+            music.addEventListener(MusicKit.Events.storefrontDidChange, handleStorefrontChange);
+
+            if (music.isAuthorized) {
+                handleAuthChange();
+            }
+
+        } catch (error) {
+            addLog('Failed to initialize MusicKit', 'error', error.message);
+        }
+    }
+
+    async function handleAuthorize() {
+        try {
+            addLog('Requesting authorization...', 'info');
+            await music.authorize();
+        } catch (error) {
+            addLog('Authorization failed', 'error', error.message);
+        }
+    }
+
+    async function handleRevoke() {
+        try {
+            addLog('Revoking authorization...', 'info');
+            await music.unauthorize();
+            userToken = null;
+            updateStatus(false);
+            addLog('Authorization revoked', 'success');
+        } catch (error) {
+            addLog('Failed to revoke authorization', 'error', error.message);
+        }
+    }
+
+    async function handleAuthChange() {
+        try {
+            if (music.isAuthorized) {
+                userToken = await music.musicUserToken;
+                addLog('Authorization successful', 'success', {
+                    storefrontId: music.storefrontId
+                });
+
+                updateStatus(true, {
+                    userToken: userToken,
+                    storefrontId: music.storefrontId
+                });
+            } else {
+                userToken = null;
+                updateStatus(false);
+            }
+        } catch (error) {
+            addLog('Error handling authorization change', 'error', error.message);
+        }
+    }
+
+    function handleStorefrontChange() {
+        if (music.isAuthorized) {
+            addLog('Storefront changed', 'info', {
+                storefrontId: music.storefrontId
+            });
+
+            updateStatus(true, {
+                userToken: userToken,
+                storefrontId: music.storefrontId
+            });
+        }
+    }
+
+    document.addEventListener('musickitloaded', initializeMusicKit);
+    document.getElementById('auth-button').addEventListener('click', handleAuthorize);
+    document.getElementById('revoke-button').addEventListener('click', handleRevoke);
+</script>
+{% endblock %} 

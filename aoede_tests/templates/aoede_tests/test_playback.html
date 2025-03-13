@@ -1,0 +1,189 @@
+{% extends 'converter/base.html' %}
+{% load static %}
+
+{% block title %}WHY LOVE - Asake | SonusShare{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .playback-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .song-details {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
+        margin-bottom: 3rem;
+        padding: 2rem;
+        background: white;
+        border: 2px solid #333;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .song-info {
+        width: 100%;
+    }
+
+    .song-name {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+
+    .song-artist {
+        font-size: 1.5rem;
+        color: #666;
+        margin-bottom: 1.5rem;
+    }
+
+    .song-meta {
+        font-size: 1rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+
+    .player-container {
+        width: 100%;
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 1rem;
+        background: white;
+        border: 2px solid #333;
+        border-radius: 8px;
+    }
+
+    .error-message {
+        padding: 1rem;
+        color: #dc2626;
+        background: rgba(220, 38, 38, 0.1);
+        border: 1px solid rgba(220, 38, 38, 0.2);
+        margin: 1rem 0;
+    }
+
+    apple-music-playback-controls {
+        margin: 1rem 0;
+    }
+
+    apple-music-progress {
+        margin: 1rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="playback-container">
+    <div class="song-details" id="song-details">
+        <!-- Song details will be populated here -->
+    </div>
+
+    <div class="player-container">
+        <apple-music-artwork width="300"></apple-music-artwork>
+        <apple-music-playback-controls></apple-music-playback-controls>
+        <apple-music-progress></apple-music-progress>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" data-web-components async></script>
+<script>
+document.addEventListener('musickitloaded', async function() {
+    try {
+        await MusicKit.configure({
+            developerToken: '{{ developer_token }}',
+            app: {
+                name: 'SonusShare',
+                build: '1.0.0'
+            }
+        });
+        
+        const music = MusicKit.getInstance();
+        const ALBUM_ID = '1794619833'; // Album ID for WHY LOVE - Single
+
+        async function loadSong() {
+            try {
+                console.log('Loading album details...');
+                // Simplified API request for album data
+                const { data: { data: [albumData] = [] } } = await music.api.music(
+                    `/v1/catalog/us/albums/${ALBUM_ID}`,
+                    { 
+                        fields: 'artwork,name,artistName,trackCount,releaseDate,genreNames',
+                        l: 'en-gb'
+                    }
+                );
+                
+                console.log('Album data:', albumData);
+                
+                if (!albumData) {
+                    console.error('No album data found in API response');
+                    throw new Error('No album data found in API response');
+                }
+
+                const songDetails = document.getElementById('song-details');
+                
+                // Get artwork URL with high resolution
+                const artworkUrl = albumData.attributes?.artwork ? 
+                    MusicKit.formatArtworkURL(albumData.attributes.artwork, 600, 600) :
+                    null;
+                console.log('Artwork URL:', artworkUrl);
+                
+                songDetails.innerHTML = `
+                    <div class="song-info">
+                        <div class="song-name">WHY LOVE</div>
+                        <div class="song-artist">Asake</div>
+                        <div class="song-meta">Album: WHY LOVE - Single</div>
+                        <div class="song-meta">Released: 12 February 2025</div>
+                        <div class="song-meta">Duration: 3:00</div>
+                        <div class="song-meta">Genre: AMAPIANO</div>
+                        <div class="song-meta">℗ 2025 Giran Republic</div>
+                    </div>
+                `;
+
+                // Set the artwork source
+                const artworkElement = document.querySelector('apple-music-artwork');
+                if (artworkElement && albumData.attributes?.artwork) {
+                    console.log('Setting artwork:', albumData.attributes.artwork);
+                    artworkElement.source = albumData.attributes.artwork;
+                    artworkElement.alt = 'WHY LOVE - Asake';
+                } else {
+                    console.warn('Artwork element or artwork data not found');
+                }
+                
+                // Set up queue for the first track
+                console.log('Setting up playback queue...');
+                await music.setQueue({
+                    album: ALBUM_ID,
+                    startPlaying: true
+                });
+                console.log('Queue set successfully');
+                
+            } catch (error) {
+                console.error('Error loading album:', error);
+                document.getElementById('song-details').innerHTML = `
+                    <div class="error-message">
+                        Error loading album: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Initial load
+        loadSong();
+        
+    } catch (error) {
+        console.error('Failed to initialize MusicKit:', error);
+        document.getElementById('song-details').innerHTML = `
+            <div class="error-message">
+                Failed to initialize Apple Music: ${error.message}
+            </div>
+        `;
+    }
+});
+</script>
+{% endblock %} 

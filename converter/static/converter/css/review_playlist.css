@@ -1,0 +1,95 @@
+.review-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px auto;
+    background-color: rgba(255, 255, 255, 0.04);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 80%;
+    max-width: 1200px;
+}
+
+.playlist-info {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.song-table-container {
+    width: 80%;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+th {
+    background-color: #f2f2f2; 
+    border-radius: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.create-button-container {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.create-button {
+    background-color: #FF99C8;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.create-button:hover {
+    background-color: #FF6F91;
+}
+
+.status-success {
+    color: #4CAF50;
+}
+
+.status-failed {
+    color: #f44336;
+}
+
+.summary-container {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.error-message {
+    background-color: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #991b1b;
+    padding: 12px;
+    border-radius: 6px;
+    margin: 10px 0;
+    display: none;
+    text-align: center;
+}
+
+.create-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Add any additional page-specific styles here */

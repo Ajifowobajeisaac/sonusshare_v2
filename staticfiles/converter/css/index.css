@@ -1,0 +1,204 @@
+/* converter/static/converter/css/index.css */
+
+/* Main Layout */
+main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 4rem;
+}
+
+/* Hero Section */
+.hero-text {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.hero-text h2 {
+    font-size: 2.5rem;
+    font-weight: normal;
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.hero-text p {
+    font-size: 1.2rem;
+    color: #666;
+}
+
+/* Platform Logos */
+.platform-logo-container {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    margin-bottom: 4rem;
+}
+
+.platform-logo-container img {
+    height: 40px;
+    width: auto;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.platform-logo-container img:hover {
+    opacity: 1;
+}
+
+/* Input Section */
+.input-container {
+    max-width: 800px;
+    margin: 0 auto 4rem;
+}
+
+.input-container form {
+    display: flex;
+    gap: 1rem;
+    position: relative;
+}
+
+/* Hand-drawn Input Styles */
+input[type="text"] {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    background: white;
+    border: 2px solid #333;
+    border-radius: 0;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+input[type="text"]::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border: 2px solid #333;
+    pointer-events: none;
+    opacity: 0.3;
+}
+
+select {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    background: white;
+    border: 2px solid #333;
+    border-radius: 0;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1em;
+    padding-right: 3rem;
+}
+
+button {
+    padding: 1rem 2rem;
+    font-size: 1rem;
+    background: #333;
+    color: white;
+    border: 2px solid #333;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+button:hover {
+    background: white;
+    color: #333;
+}
+
+button::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border: 2px solid #333;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+button:hover::after {
+    opacity: 0.3;
+}
+
+/* Image Grid */
+.image-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    margin: 0 auto;
+    max-width: 1200px;
+}
+
+.image-container img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+}
+
+.image-container img:hover {
+    transform: scale(1.05);
+}
+
+/* Responsive Design */
+@media screen and (max-width: 1024px) {
+    main {
+        padding: 2rem;
+    }
+
+    .image-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .input-container form {
+        flex-direction: column;
+    }
+
+    .platform-logo-container {
+        gap: 2rem;
+    }
+
+    .image-container {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    input[type="text"],
+    select,
+    button {
+        width: 100%;
+    }
+}
+
+/* Hand-drawn Animation */
+@keyframes draw {
+    0% {
+        stroke-dashoffset: 1000;
+    }
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
+.input-container input:focus,
+.input-container select:focus {
+    outline: none;
+    border-color: #000;
+    box-shadow: 
+        2px 2px 0 #333,
+        -2px -2px 0 #333,
+        2px -2px 0 #333,
+        -2px 2px 0 #333;
+}

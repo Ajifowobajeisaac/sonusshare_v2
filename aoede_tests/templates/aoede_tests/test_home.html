@@ -1,0 +1,191 @@
+{% extends 'converter/base.html' %}
+{% load static %}
+
+{% block title %}Aoede - Test Directory{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'aoede_tests/css/test_center.css' %}">
+<style>
+    .test-nav {
+        display: flex;
+        justify-content: space-between;
+        padding: 2rem 4rem;
+        align-items: center;
+    }
+    
+    .test-nav-left, .test-nav-right {
+        display: flex;
+        gap: 2rem;
+    }
+    
+    .test-nav a {
+        text-decoration: none;
+        color: #333;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .test-header {
+        text-align: center;
+        padding: 4rem 0;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .test-logo {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 2rem;
+    }
+    
+    .test-title {
+        font-size: 2.5rem;
+        font-weight: normal;
+        margin-bottom: 1.5rem;
+        color: #333;
+    }
+    
+    .test-description {
+        font-size: 1.2rem;
+        line-height: 1.6;
+        color: #666;
+    }
+    
+    .test-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2rem;
+        padding: 2rem 4rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .test-card {
+        position: relative;
+        aspect-ratio: 4/3;
+        overflow: hidden;
+        background: #f5f5f5;
+        transition: transform 0.3s ease;
+    }
+    
+    .test-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .test-card-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .test-card-content {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 1.5rem;
+        background: rgba(255, 255, 255, 0.9);
+    }
+    
+    .test-card-title {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+    
+    .test-card-description {
+        font-size: 0.9rem;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Base Header -->
+<header class="aoede-base-header">
+    <a href="{% url 'aoede_tests:home' %}">
+        <img src="{% static 'aoede_tests/images/logo.png' %}" alt="Aoede Logo">
+        <h1>Aoede Tests</h1>
+        <p>A comprehensive suite of testing tools for validating and ensuring the reliability of music platform integrations</p>
+    </a>
+</header>
+
+<!-- Test Grid -->
+<div class="test-grid">
+    <!-- Authentication Card -->
+    <a href="{% url 'aoede_tests:auth' %}" class="test-card">
+        <div class="test-card-image" style="background: linear-gradient(45deg, #1DB954, #FA243C); display: grid; place-items: center;">
+            <div style="display: flex; gap: 2rem; align-items: center;">
+                <img src="{% static 'aoede_tests/images/spotify-logo.png' %}" alt="Spotify" style="width: 30%; height: 30%; object-fit: contain;">
+                <img src="{% static 'aoede_tests/images/apple-music-logo.svg' %}" alt="Apple Music" style="width: 30%; height: 30%; object-fit: contain;">
+            </div>
+        </div>
+        <div class="test-card-content">
+            <h2 class="test-card-title">Authentication Tests</h2>
+            <p class="test-card-description">OAuth flow and token management for music platforms</p>
+        </div>
+    </a>
+
+    <!-- Search Card -->
+    <a href="{% url 'aoede_tests:search' %}" class="test-card">
+        <div class="test-card-image" style="background: #E34C67; display: grid; place-items: center;">
+            <span style="font-size: 5rem; color: white;">🔍</span>
+        </div>
+        <div class="test-card-content">
+            <h2 class="test-card-title">Search & Matching</h2>
+            <p class="test-card-description">Cross-platform track search and matching algorithms</p>
+        </div>
+    </a>
+
+    <!-- Playlist Card -->
+    <a href="{% url 'aoede_tests:playlist' %}" class="test-card">
+        <div class="test-card-image" style="background: #4A90E2; display: grid; place-items: center;">
+            <span style="font-size: 5rem; color: white;">📝</span>
+        </div>
+        <div class="test-card-content">
+            <h2 class="test-card-title">Playlist Management</h2>
+            <p class="test-card-description">Playlist creation and modification across platforms</p>
+        </div>
+    </a>
+
+    <!-- Token Card -->
+    <a href="{% url 'aoede_tests:token' %}" class="test-card">
+        <div class="test-card-image" style="background: #F5A623; display: grid; place-items: center;">
+            <span style="font-size: 5rem; color: white;">🔑</span>
+        </div>
+        <div class="test-card-content">
+            <h2 class="test-card-title">Token Management</h2>
+            <p class="test-card-description">Token generation, validation, and refresh flows</p>
+        </div>
+    </a>
+
+    <!-- Playback Card -->
+    <a href="{% url 'aoede_tests:playback' %}" class="test-card">
+        <div class="test-card-image" style="background: #FA243C; display: grid; place-items: center;">
+            <span style="font-size: 5rem; color: white;">▶️</span>
+        </div>
+        <div class="test-card-content">
+            <h2 class="test-card-title">Playback Tests</h2>
+            <p class="test-card-description">Test music playback using the MusicKit JS API</p>
+        </div>
+    </a>
+
+    <!-- Artwork Card -->
+    <a href="{% url 'aoede_tests:artwork' %}" class="test-card">
+        <div class="test-card-image" style="background: #7C3AED; display: grid; place-items: center;">
+            <span style="font-size: 5rem; color: white;">🖼️</span>
+        </div>
+        <div class="test-card-content">
+            <h2 class="test-card-title">Artwork Tests</h2>
+            <p class="test-card-description">Test playlist artwork loading and formatting</p>
+        </div>
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'aoede_tests/js/test_console.js' %}"></script>
+<script src="{% static 'aoede_tests/js/test_runner.js' %}"></script>
+<script src="{% static 'aoede_tests/js/test_search.js' %}"></script>
+{% endblock %} 

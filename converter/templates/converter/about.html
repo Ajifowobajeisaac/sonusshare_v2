@@ -1,0 +1,228 @@
+{% extends 'converter/base.html' %}
+{% load static %}
+
+{% block title %}About - SonusShare{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .about-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 4rem 2rem;
+    }
+
+    .about-header {
+        text-align: center;
+        margin-bottom: 4rem;
+    }
+
+    .about-header h1 {
+        font-size: 2.5rem;
+        font-weight: normal;
+        color: #333;
+        margin-bottom: 1rem;
+    }
+
+    .about-header p {
+        font-size: 1.1rem;
+        color: #666;
+        max-width: 600px;
+        margin: 0 auto;
+        line-height: 1.6;
+    }
+
+    .about-section {
+        margin-bottom: 4rem;
+        border: 2px solid #333;
+        padding: 2rem;
+        background: white;
+    }
+
+    .about-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .about-section h2 {
+        font-size: 1.5rem;
+        font-weight: normal;
+        color: #333;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+
+    .feature-item {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .feature-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 8px;
+        font-size: 1.5rem;
+    }
+
+    .feature-content h3 {
+        font-size: 1.1rem;
+        font-weight: normal;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+
+    .feature-content p {
+        font-size: 0.9rem;
+        color: #666;
+        line-height: 1.5;
+    }
+
+    .platform-logos {
+        display: flex;
+        justify-content: center;
+        gap: 3rem;
+        margin-top: 2rem;
+    }
+
+    .platform-logos img {
+        height: 40px;
+        width: auto;
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+    }
+
+    .platform-logos img:hover {
+        opacity: 1;
+    }
+
+    .team-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+
+    .team-member {
+        text-align: center;
+    }
+
+    .team-member img {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        margin-bottom: 1rem;
+        border: 2px solid #333;
+    }
+
+    .team-member h3 {
+        font-size: 1.1rem;
+        font-weight: normal;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+
+    .team-member p {
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    @media screen and (max-width: 768px) {
+        .feature-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .team-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media screen and (max-width: 480px) {
+        .team-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .platform-logos {
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="about-container">
+    <div class="about-header">
+        <h1>About SonusShare</h1>
+        <p>Seamlessly convert and share your favorite playlists across music streaming platforms with our intuitive and powerful playlist conversion tool.</p>
+    </div>
+
+    <div class="about-section">
+        <h2>Our Mission</h2>
+        <p>At SonusShare, we believe that music should be shared without boundaries. Our mission is to break down the barriers between music streaming platforms, making it effortless for music lovers to share their carefully curated playlists with friends and family, regardless of their preferred streaming service.</p>
+        
+        <div class="platform-logos">
+            <img src="{% static 'converter/images/spotify-logo.png' %}" alt="Spotify">
+            <img src="{% static 'converter/images/apple-music-logo.png' %}" alt="Apple Music">
+        </div>
+    </div>
+
+    <div class="about-section">
+        <h2>Features</h2>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <div class="feature-icon">🔄</div>
+                <div class="feature-content">
+                    <h3>Instant Conversion</h3>
+                    <p>Convert playlists between platforms in seconds with our advanced matching algorithm.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">🎯</div>
+                <div class="feature-content">
+                    <h3>Accurate Matching</h3>
+                    <p>Smart track matching ensures your playlists maintain their integrity across platforms.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">🔒</div>
+                <div class="feature-content">
+                    <h3>Secure & Private</h3>
+                    <p>Your data is handled securely with industry-standard encryption and privacy measures.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-content">
+                    <h3>Fast & Reliable</h3>
+                    <p>Built for speed and reliability, with real-time progress tracking and error handling.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="about-section">
+        <h2>The Team</h2>
+        <div class="team-grid">
+            <div class="team-member">
+                <img src="{% static 'converter/images/team/developer.png' %}" alt="Developer">
+                <h3>Isaac Ajifowobaje</h3>
+                <p>Lead Developer</p>
+                <p>UI/UX Designer</p>
+                <p>Product Manager</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

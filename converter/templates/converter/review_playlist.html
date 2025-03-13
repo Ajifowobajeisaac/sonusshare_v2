@@ -1,0 +1,469 @@
+<!-- review playlist -->
+{% extends 'converter/base.html' %}
+{% load static %}
+
+{% block title %}{{ playlist_name }} - Review Playlist | SonusShare{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'converter/css/review_playlist.css' %}">
+<style>
+    .review-container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+    }
+
+    .playlist-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .artwork-container {
+        width: 300px;
+        height: 300px;
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #f5f5f5;
+        flex-shrink: 0;
+    }
+
+    .playlist-artwork {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .playlist-artwork-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 4rem;
+        color: #333;
+        background: #e5e5e5;
+        text-transform: uppercase;
+    }
+
+    .playlist-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .playlist-name {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .playlist-curator {
+        color: #666;
+        margin-bottom: 1rem;
+    }
+
+    .playlist-description {
+        color: #444;
+        margin-bottom: 1rem;
+    }
+
+    .song-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 2rem;
+    }
+
+    .song-table th,
+    .song-table td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+
+    .song-table th {
+        background: #f5f5f5;
+        font-weight: 600;
+    }
+
+    .song-checkbox {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .select-all-container {
+        margin: 1rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .convert-button {
+        display: inline-block;
+        padding: 1rem 2rem;
+        background: #333;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.3s ease;
+        margin-top: 2rem;
+    }
+
+    .convert-button:hover {
+        background: #555;
+    }
+
+    .convert-button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .message {
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+    }
+
+    .error-message {
+        background: #fee;
+        color: #c00;
+        border: 1px solid #fcc;
+    }
+
+    .success-message {
+        background: #efe;
+        color: #0c0;
+        border: 1px solid #cfc;
+    }
+</style>
+{% endblock %}
+
+{% block extra_head %}
+<!-- Load MusicKit script -->
+<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" data-web-components async></script>
+
+<script>
+    // Logging utility
+    function addLog(message, type = 'info', details = null) {
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`[${timestamp}][${type.toUpperCase()}] ${message}`);
+        if (details) {
+            console.log('Details:', details);
+        }
+    }
+
+    // Function to show error messages
+    function showErrorMessage(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'message error-message';
+        errorDiv.textContent = message;
+        const container = document.querySelector('.review-container');
+        container.insertBefore(errorDiv, container.firstChild);
+        addLog(message, 'error');
+    }
+
+    // Function to update artwork
+    async function updatePlaylistArtwork(playlistId) {
+        try {
+            addLog('Fetching playlist artwork...', 'info', { playlistId });
+            
+            const response = await fetch(
+                `https://api.music.apple.com/v1/catalog/gb/playlists/${playlistId}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer {{ developer_token }}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            addLog('Received playlist data', 'info', {
+                hasData: Boolean(data.data),
+                dataLength: data.data?.length,
+                hasAttributes: Boolean(data.data?.[0]?.attributes)
+            });
+
+            if (data.data?.[0]?.attributes?.artwork) {
+                const artwork = data.data[0].attributes.artwork;
+                addLog('Raw artwork data', 'info', artwork);
+
+                const artworkUrl = MusicKit.formatArtworkURL(artwork, 600, 600);
+                addLog('Formatted artwork URL', 'info', {
+                    original: artwork.url,
+                    formatted: artworkUrl
+                });
+
+                // Update the artwork container
+                const container = document.getElementById('playlist-artwork');
+                if (container) {
+                    container.innerHTML = `
+                        <img src="${artworkUrl}" 
+                             alt="{{ playlist_name }}" 
+                             class="playlist-artwork"
+                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'playlist-artwork-placeholder\'><span>{{ playlist_name|slice:":1" }}</span></div>'; addLog('Failed to load artwork', 'error');"
+                             onload="addLog('Successfully loaded artwork', 'success');">
+                    `;
+                    addLog('Updated artwork container', 'success');
+                } else {
+                    throw new Error('Artwork container not found');
+                }
+            } else {
+                throw new Error('No artwork found in playlist data');
+            }
+        } catch (error) {
+            addLog('Failed to update artwork', 'error', {
+                error: error.message,
+                stack: error.stack
+            });
+            showErrorMessage('Failed to load playlist artwork');
+            
+            // Show placeholder on error
+            const container = document.getElementById('playlist-artwork');
+            if (container) {
+                container.innerHTML = `
+                    <div class="playlist-artwork-placeholder">
+                        <span>{{ playlist_name|slice:":1" }}</span>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // Initialize MusicKit and load artwork
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            addLog('Waiting for MusicKit to load...');
+            
+            // Wait for MusicKit to be available
+            if (typeof MusicKit === 'undefined') {
+                document.addEventListener('musickitloaded', initializeMusicKit);
+                addLog('Added musickitloaded event listener');
+            } else {
+                await initializeMusicKit();
+            }
+        } catch (error) {
+            addLog('Error in DOMContentLoaded handler', 'error', {
+                error: error.message,
+                stack: error.stack
+            });
+        }
+    });
+
+    // Initialize MusicKit
+    async function initializeMusicKit() {
+        try {
+            addLog('Initializing MusicKit...');
+            
+            const music = await MusicKit.configure({
+                developerToken: '{{ developer_token }}',
+                app: {
+                    name: 'SonusShare',
+                    build: '1.0.0'
+                }
+            });
+
+            addLog('MusicKit initialized successfully', 'success', {
+                version: MusicKit.version,
+                hasToken: Boolean('{{ developer_token }}')
+            });
+
+            // Check if we should fetch artwork
+            const sourcePlatform = '{{ source_platform }}';
+            const playlistId = '{{ playlist_id }}';
+            
+            addLog('Checking playlist details', 'info', {
+                sourcePlatform,
+                playlistId
+            });
+
+            if (sourcePlatform === 'apple_music' && playlistId) {
+                await updatePlaylistArtwork(playlistId);
+            } else {
+                addLog('Skipping artwork update - not an Apple Music playlist', 'info');
+            }
+        } catch (error) {
+            addLog('MusicKit initialization failed', 'error', {
+                error: error.message,
+                stack: error.stack
+            });
+            showErrorMessage('Failed to initialize Apple Music. Please try again.');
+        }
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+    <script>
+        console.log('Checking developer token on page load:', {
+            tokenExists: Boolean('{{ developer_token }}'),
+            tokenLength: '{{ developer_token }}'.length,
+            tokenFirstChars: '{{ developer_token }}'.substring(0, 10),
+            rawToken: '{{ developer_token }}'
+        });
+    </script>
+
+    <div class="review-container">
+        {% if auth_success %}
+        <div class="message success-message">
+            Successfully authenticated with Spotify! Creating your playlist...
+        </div>
+        <script>
+            // Automatically trigger playlist creation after successful auth
+            document.addEventListener('DOMContentLoaded', function() {
+                createPlaylist();
+            });
+        </script>
+        {% endif %}
+
+        {% if error_message %}
+        <div class="message error-message">
+            {{ error_message }}
+        </div>
+        {% endif %}
+
+        {% if playlist_name %}
+        <div class="playlist-header">
+            <div class="artwork-container" id="playlist-artwork">
+                {% if playlist_artwork_url %}
+                <img src="{{ playlist_artwork_url }}" alt="{{ playlist_name }}" class="playlist-artwork">
+                {% else %}
+                <div class="playlist-artwork-placeholder">
+                    <span>{{ playlist_name|slice:":1" }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="playlist-details">
+                <h1 class="playlist-name">{{ playlist_name }}</h1>
+                <div class="playlist-curator">{{ playlist_curator }}</div>
+                {% if playlist_description %}
+                <div class="playlist-description">{{ playlist_description }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="select-all-container">
+            <input type="checkbox" id="select-all" class="song-checkbox">
+            <label for="select-all">Select All Songs</label>
+        </div>
+
+        <form id="convert-form" method="post" action="{% url 'create_playlist' %}">
+            {% csrf_token %}
+            <input type="hidden" name="playlist_url" value="{{ playlist_url }}">
+            <input type="hidden" name="source_platform" value="{{ source_platform }}">
+            <table class="song-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px">Select</th>
+                        <th>Track Name</th>
+                        <th>Artist</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for track in tracks %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" 
+                                   name="selected_tracks" 
+                                   value="{{ forloop.counter0 }}"
+                                   class="song-checkbox"
+                                   checked>
+                        </td>
+                        <td>{{ track.name }}</td>
+                        <td>{{ track.artist }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <button type="submit" class="convert-button">
+                Convert Selected Songs to Spotify
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <script>
+        // Select all functionality
+        const selectAllCheckbox = document.getElementById('select-all');
+        const songCheckboxes = document.querySelectorAll('input[name="selected_tracks"]');
+
+        if (selectAllCheckbox && songCheckboxes.length > 0) {
+            selectAllCheckbox.checked = true; // Default to all selected
+            
+            selectAllCheckbox.addEventListener('change', (e) => {
+                songCheckboxes.forEach(checkbox => {
+                    checkbox.checked = e.target.checked;
+                });
+            });
+
+            // Update select all when individual checkboxes change
+            songCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    const allChecked = Array.from(songCheckboxes).every(cb => cb.checked);
+                    const noneChecked = Array.from(songCheckboxes).every(cb => !cb.checked);
+                    selectAllCheckbox.checked = allChecked;
+                    selectAllCheckbox.indeterminate = !allChecked && !noneChecked;
+                });
+            });
+        }
+
+        // Form submission
+        const form = document.getElementById('convert-form');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const selectedTracks = Array.from(songCheckboxes)
+                    .filter(cb => cb.checked)
+                    .map(cb => parseInt(cb.value));
+
+                if (selectedTracks.length === 0) {
+                    alert('Please select at least one song to convert');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('{% url "create_playlist" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            playlist_url: '{{ playlist_url }}',
+                            source_platform: '{{ source_platform }}',
+                            selected_tracks: selectedTracks,
+                            platform: 'spotify'
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.auth_url) {
+                        window.location.href = data.auth_url;
+                    } else if (data.playlist_url) {
+                        window.location.href = data.playlist_url;
+                    } else if (data.error) {
+                        throw new Error(data.error);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to create playlist: ' + error.message);
+                }
+            });
+        }
+    </script>
+{% endblock %}
+ 
+ 

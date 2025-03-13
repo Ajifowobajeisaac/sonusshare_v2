@@ -1,0 +1,198 @@
+{% extends 'converter/base.html' %}
+{% load static %}
+
+{% block title %}Aoede - Search Tests{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'aoede_tests/css/test_center.css' %}">
+<style>
+    .search-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 4rem 2rem;
+    }
+
+    .search-header {
+        text-align: center;
+        margin-bottom: 4rem;
+    }
+
+    .search-header h1 {
+        font-size: 2.5rem;
+        font-weight: normal;
+        color: #333;
+        margin-bottom: 1rem;
+    }
+
+    .search-header p {
+        font-size: 1.1rem;
+        color: #666;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .search-form {
+        background: white;
+        padding: 3rem;
+        border: 2px solid #333;
+        margin-bottom: 3rem;
+    }
+
+    .form-group {
+        margin-bottom: 2rem;
+    }
+
+    .form-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1rem;
+        border: 2px solid #333;
+        background: white;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+        outline: none;
+        box-shadow: 
+            2px 2px 0 #333,
+            -2px -2px 0 #333,
+            2px -2px 0 #333,
+            -2px 2px 0 #333;
+    }
+
+    .search-button {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1rem;
+        background: #333;
+        color: white;
+        border: 2px solid #333;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .search-button:hover {
+        background: white;
+        color: #333;
+    }
+
+    .results-container {
+        background: white;
+        padding: 2rem;
+        border: 2px solid #333;
+    }
+
+    .results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .results-title {
+        font-size: 1.2rem;
+        font-weight: normal;
+        color: #333;
+    }
+
+    .results-clear {
+        font-size: 0.9rem;
+        color: #666;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+        transition: color 0.3s ease;
+    }
+
+    .results-clear:hover {
+        color: #333;
+    }
+
+    .results-output {
+        font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        color: #333;
+        background: #f5f5f5;
+        padding: 1.5rem;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        overflow-x: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-container">
+    <div class="search-header">
+        <h1>Search Tests</h1>
+        <p>Test and validate cross-platform song search functionality with precise matching algorithms</p>
+    </div>
+
+    {% csrf_token %}
+    
+    <div class="search-form">
+        <div class="form-group">
+            <label for="search-track-name">Track Name</label>
+            <input type="text" id="search-track-name" value="Shape of You" placeholder="Enter track name...">
+        </div>
+        <div class="form-group">
+            <label for="search-artist-name">Artist Name</label>
+            <input type="text" id="search-artist-name" value="Ed Sheeran" placeholder="Enter artist name...">
+        </div>
+        <button class="search-button" data-test-suite="song_search">
+            Run Search Test
+        </button>
+    </div>
+
+    <div class="results-container">
+        <div class="results-header">
+            <span class="results-title">Test Results</span>
+            <button class="results-clear">Clear Results</button>
+        </div>
+        <div class="results-output"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"></script>
+<script>
+    // Initialize MusicKit
+    document.addEventListener('musickitloaded', async function() {
+        try {
+            await MusicKit.configure({
+                developerToken: '{{ developer_token }}',
+                app: {
+                    name: 'Sonusshare',
+                    build: '1.0.0'
+                }
+            });
+            console.log('MusicKit initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize MusicKit:', error);
+            const outputDiv = document.querySelector('.results-output');
+            outputDiv.innerHTML = `<div class="error-message">Failed to initialize Apple Music: ${error.message}</div>`;
+        }
+    });
+</script>
+<script src="{% static 'aoede_tests/js/test_console.js' %}"></script>
+<script src="{% static 'aoede_tests/js/test_search.js' %}"></script>
+{% endblock %} 

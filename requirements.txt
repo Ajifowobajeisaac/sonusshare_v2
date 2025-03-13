@@ -1,0 +1,27 @@
+# Core Django
+Django==4.2.13
+asgiref==3.8.1
+sqlparse==0.4.4
+typing_extensions==4.11.0
+
+# Database
+psycopg2-binary==2.9.3
+dj-database-url==2.1.0
+
+# API & Music Services
+spotipy==2.23.0
+requests==2.31.0
+PyJWT==2.8.0  # For Apple Music JWT token generation
+
+# Security & Encryption
+cryptography==42.0.7  # For handling Apple Music private keys
+
+# Production Server
+gunicorn==22.0.0
+whitenoise==6.6.0  # For serving static files
+
+# Utils
+python-dateutil==2.9.0.post0
+urllib3==2.2.1
+certifi==2024.2.2
+idna==3.7

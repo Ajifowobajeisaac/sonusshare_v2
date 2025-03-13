@@ -1,0 +1,277 @@
+<!-- review playlist -->
+{% extends 'converter/base.html' %}
+{% load static %}
+
+{% block title %}SonusShare - Review Playlist{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'converter/css/review_playlist.css' %}">
+<style>
+    .message {
+        padding: 10px 20px;
+        border-radius: 4px;
+        margin: 10px 0;
+        text-align: center;
+    }
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+</style>
+{% endblock %}
+
+{% block extra_head %}
+<script>
+    // Check if MusicKit loaded successfully
+    function isMusicKitLoaded() {
+        return typeof MusicKit !== 'undefined';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM Content Loaded');
+        const createButton = document.querySelector('.create-button');
+        if (createButton) {
+            console.log('Found create button, attaching click listener');
+            createButton.addEventListener('click', async function(e) {
+                console.log('Button clicked!');
+                e.preventDefault();
+                try {
+                    await createPlaylist();
+                } catch (error) {
+                    console.error('Error in click handler:', error);
+                }
+            });
+        } else {
+            console.error('Create button not found!');
+        }
+    });
+</script>
+<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" 
+        defer
+        onload="console.log('MusicKit script loaded successfully')"
+        onerror="console.error('Failed to load MusicKit script')">
+</script>
+{% endblock %}
+
+{% block content %}
+    <div class="review-container">
+        {% if auth_success %}
+        <div class="message success-message">
+            Successfully authenticated with Spotify! Creating your playlist...
+        </div>
+        <script>
+            // Automatically trigger playlist creation after successful auth
+            document.addEventListener('DOMContentLoaded', function() {
+                createPlaylist();
+            });
+        </script>
+        {% endif %}
+
+        {% if error_message %}
+        <div class="message error-message">
+            {{ error_message }}
+        </div>
+        {% endif %}
+
+        <div class="playlist-info">
+            <h2>{{ playlist_name }}</h2>
+            <p>{{ playlist_description }}</p>
+            <div class="summary-container">
+                <h3>Conversion Summary</h3>
+                <p>Success Rate: {{ success_rate }}</p>
+                <p>Total Tracks: {{ matched_tracks|length }}</p>
+                <p>Successfully Matched: {{ track_ids|length }}</p>
+                <p>Failed Matches: {{ failed_tracks|length }}</p>
+            </div>
+        </div>
+
+        <div class="song-table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Track Name</th>
+                        <th>Artist</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for track in matched_tracks %}
+                    <tr>
+                        <td>{{ track.name }}</td>
+                        <td>{{ track.artist }}</td>
+                        <td class="{% if track.matched %}status-success{% else %}status-failed{% endif %}">
+                            {% if track.matched %}
+                                ✓ Matched
+                            {% else %}
+                                ✗ No match found
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="create-button-container">
+            <button class="create-button" type="button">Create Playlist on {{ platform|title }}</button>
+        </div>
+    </div>
+
+    <script>
+        // Add this function to check MusicKit availability
+        function waitForMusicKit() {
+            return new Promise((resolve, reject) => {
+                if (isMusicKitLoaded()) {
+                    resolve();
+                    return;
+                }
+
+                let attempts = 0;
+                const maxAttempts = 10;
+                const interval = setInterval(() => {
+                    attempts++;
+                    if (isMusicKitLoaded()) {
+                        clearInterval(interval);
+                        resolve();
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(interval);
+                        reject(new Error('MusicKit failed to load after multiple attempts'));
+                    }
+                }, 500);
+            });
+        }
+
+        async function createPlaylist() {
+            const button = document.querySelector('.create-button');
+            button.disabled = true;
+            button.textContent = 'Creating playlist...';
+
+            const csrftoken = getCookie('csrftoken');
+            const platform = '{{ platform }}';  // Get platform from template context
+
+            console.log('Creating playlist for platform:', platform);
+
+            if (platform === 'apple_music') {
+                try {
+                    console.log('Waiting for MusicKit to load...');
+                    await waitForMusicKit();
+                    
+                    console.log('Configuring MusicKit...');
+                    // Configure MusicKit
+                    await MusicKit.configure({
+                        developerToken: '{{ developer_token }}',
+                        app: {
+                            name: 'SonusShare',
+                            build: '1.0.0'
+                        }
+                    });
+
+                    console.log('Getting MusicKit instance...');
+                    const music = MusicKit.getInstance();
+
+                    console.log('Requesting authorization...');
+                    await music.authorize();
+
+                    console.log('Getting Music User Token...');
+                    const userToken = music.musicUserToken;
+                    console.log('User token obtained:', userToken ? 'Yes' : 'No');
+
+                    console.log('Making playlist creation request...');
+                    const response = await fetch('{% url "create_playlist" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken
+                        },
+                        body: JSON.stringify({
+                            music_user_token: userToken
+                        }),
+                        credentials: 'same-origin'
+                    });
+
+                    console.log('Parsing response...');
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to create playlist');
+                    }
+
+                    button.textContent = 'Playlist Created!';
+                    if (data.playlist_url) {
+                        window.location.href = data.playlist_url;
+                    }
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    button.textContent = 'Create Playlist on Apple Music';
+                    button.disabled = false;
+                    showErrorMessage(error.message);
+                }
+            } else {
+                // Existing Spotify logic
+                fetch('{% url "create_playlist" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': csrftoken
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json().then(data => {
+                    if (!response.ok) {
+                        if (response.status === 401 && data.auth_url) {
+                            window.location.href = data.auth_url;
+                            return;
+                        }
+                        throw new Error(data.error || 'Failed to create playlist');
+                    }
+                    return data;
+                }))
+                .then(data => {
+                    if (data && data.playlist_url) {
+                        button.textContent = 'Playlist Created!';
+                        window.location.href = data.playlist_url;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    button.textContent = 'Create Playlist on {{ platform|title }}';
+                    button.disabled = false;
+                    showErrorMessage(error.message);
+                });
+            }
+        }
+
+        function showErrorMessage(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'message error-message';
+            errorDiv.textContent = 'Error creating playlist: ' + message;
+            document.querySelector('.review-container').insertBefore(
+                errorDiv,
+                document.querySelector('.playlist-info')
+            );
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+{% endblock %}
+ 
