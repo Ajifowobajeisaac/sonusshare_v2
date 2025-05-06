@@ -5,11 +5,11 @@ from django.shortcuts import render, redirect
 import logging
 import json
 from .utilities.utils_spotify import SpotifyAPI, SpotifyAPIError
-from .utilities.utils_apple_music import AppleMusicAPI, AppleMusicAPIError
+from .utilities.utils_apple_music import get_developer_token, AppleMusicAPI, AppleMusicAPIError
 from .utilities.utils import sanitize_description, extract_playlist_id, extract_track_info
 import time
-from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.conf import settings
 import secrets
 from urllib.parse import urlencode
@@ -85,9 +85,55 @@ def contact(request):
     return render(request, 'converter/contact.html')
 
 def review_playlist(request):
-    data = json.loads(request.GET.get('data', '{}'))
-    data['developer_token'] = settings.APPLE_MUSIC_DEVELOPER_TOKEN
-    return render(request, 'converter/review_playlist.html', data)
+    """Review and confirm playlist before creation"""
+    try:
+        # Get playlist data from session
+        playlist_data = request.session.get('playlist_data')
+        if not playlist_data:
+            return redirect('converter:index')
+            
+        # Get Spotify tokens from session
+        access_token = request.session.get('spotify_access_token')
+        refresh_token = request.session.get('spotify_refresh_token')
+        token_expires_at = request.session.get('spotify_token_expires_at')
+        
+        if not all([access_token, refresh_token, token_expires_at]):
+            # Store current playlist data for after auth
+            request.session['pending_playlist_data'] = playlist_data
+            request.session.modified = True
+            
+            # Generate auth URL with state
+            auth_url, state = generate_spotify_auth_url()
+            request.session['spotify_auth_state'] = state
+            request.session.modified = True
+            
+            return redirect(auth_url)
+            
+        # Create Spotify API instance with tokens
+        spotify = SpotifyAPI.from_token(
+            token=access_token,
+            refresh_token=refresh_token,
+            expires_in=token_expires_at - time.time()
+        )
+        
+        # Create the playlist
+        playlist_url = spotify.create_playlist(
+            name=playlist_data['playlist_name'],
+            description=playlist_data.get('playlist_description', ''),
+            track_ids=playlist_data['track_ids']
+        )
+        
+        # Clear session data
+        request.session.pop('playlist_data', None)
+        request.session.modified = True
+        
+        return redirect(playlist_url)
+        
+    except Exception as e:
+        logger.error(f"Failed to create playlist: {str(e)}")
+        return render(request, 'converter/error.html', {
+            'error': f"Failed to create playlist: {str(e)}"
+        })
 
 def convert_playlist(request):
     """Main playlist conversion logic"""
@@ -102,6 +148,10 @@ def convert_playlist(request):
     
     try:
         logger.info(f"Converting playlist to {destination_platform}: {playlist_url}")
+        
+        # Get developer token
+        developer_token = get_developer_token()
+        logger.info(f"Using developer token: {developer_token[:20]}...")
         
         # Validate URL format and get source platform
         if 'music.apple.com' in playlist_url:
@@ -119,8 +169,9 @@ def convert_playlist(request):
         playlist_id = extract_playlist_id(playlist_url, source_platform)
         
         if source_platform == 'apple_music':
-            apple_music = AppleMusicAPI()
+            apple_music = AppleMusicAPI(developer_token=developer_token)
             playlist_data = apple_music.get_playlist(playlist_id)
+            logger.info(f"Retrieved playlist data: {playlist_data}")
             tracks = extract_track_info(
                 playlist_data['data'][0]['relationships']['tracks']['data'], 
                 'apple_music'
@@ -139,9 +190,10 @@ def convert_playlist(request):
         failed_tracks = []
         matched_tracks = []
         
-        api = SpotifyAPI() if destination_platform == 'spotify' else AppleMusicAPI()
+        api = SpotifyAPI() if destination_platform == 'spotify' else AppleMusicAPI(developer_token=developer_token)
         
         for track in tracks:
+            logger.info(f"Searching for track: {track['name']} by {track['artist']}")
             result = api.search_track(track['name'], track['artist'])
             track_info = {
                 'name': track['name'],
@@ -194,6 +246,7 @@ def convert_playlist(request):
         return JsonResponse({'error': str(e)}, status=400)
 
 def generate_spotify_auth_url():
+    """Generate Spotify authorization URL with state parameter"""
     state = secrets.token_urlsafe(16)
     scope = "playlist-modify-public playlist-modify-private"
     params = {
@@ -201,7 +254,8 @@ def generate_spotify_auth_url():
         'response_type': 'code',
         'redirect_uri': settings.SPOTIFY_REDIRECT_URI,
         'state': state,
-        'scope': scope
+        'scope': scope,
+        'show_dialog': True  # Force user to choose account
     }
     auth_url = f"https://accounts.spotify.com/authorize?{urlencode(params)}"
     return auth_url, state
@@ -214,113 +268,107 @@ def create_playlist(request):
         if not playlist_data:
             return JsonResponse({'error': 'No playlist data found'}, status=400)
 
-        platform = playlist_data.get('platform')
-        if platform == 'spotify':
-            token = request.session.get('spotify_token')
-            logger.info(f"Token present: {bool(token)}")
+        # Get Spotify tokens from session
+        access_token = request.session.get('spotify_access_token')
+        refresh_token = request.session.get('spotify_refresh_token')
+        token_expires_at = request.session.get('spotify_token_expires_at')
+        
+        if not all([access_token, refresh_token, token_expires_at]):
+            # Store playlist data before auth
+            request.session['pending_playlist_data'] = playlist_data
+            request.session.modified = True
             
-            if not token:
-                # Store playlist data before auth
-                request.session['pending_playlist_data'] = playlist_data
-                request.session.modified = True
-                
-                # Generate auth URL
-                auth_url, state = generate_spotify_auth_url()
-                request.session['spotify_auth_state'] = state
-                request.session.modified = True
-                
-                return JsonResponse({
-                    'error': 'Not authenticated with Spotify',
-                    'auth_url': auth_url
-                }, status=401)
-                
-            try:
-                spotify = SpotifyAPI.from_token(token)
-                logger.info(f"Creating playlist: {playlist_data['playlist_name']}")
-                
-                playlist_url = spotify.create_playlist(
-                    name=playlist_data['playlist_name'],
-                    description=playlist_data.get('playlist_description', ''),
-                    track_ids=playlist_data['track_ids']
-                )
-                
-                # Clear session data after success
-                request.session.pop('playlist_data', None)
-                request.session.pop('pending_playlist_data', None)
-                request.session.modified = True
-                
-                return JsonResponse({'playlist_url': playlist_url})
+            # Generate auth URL with state
+            auth_url, state = generate_spotify_auth_url()
+            request.session['spotify_auth_state'] = state
+            request.session.modified = True
             
-            except Exception as e:
-                logger.error(f"Failed to create playlist: {str(e)}", exc_info=True)
-                return JsonResponse({'error': str(e)}, status=400)
-        else:
-            return JsonResponse({'error': 'Unsupported platform'}, status=400)
-
+            return JsonResponse({
+                'error': 'Not authenticated with Spotify',
+                'auth_url': auth_url
+            }, status=401)
+            
+        try:
+            # Create Spotify API instance with tokens
+            spotify = SpotifyAPI.from_token(
+                token=access_token,
+                refresh_token=refresh_token,
+                expires_in=token_expires_at - time.time()
+            )
+            
+            logger.info(f"Creating playlist: {playlist_data['playlist_name']}")
+            
+            playlist_url = spotify.create_playlist(
+                name=playlist_data['playlist_name'],
+                description=playlist_data.get('playlist_description', ''),
+                track_ids=playlist_data['track_ids']
+            )
+            
+            # Clear session data after success
+            request.session.pop('playlist_data', None)
+            request.session.pop('pending_playlist_data', None)
+            request.session.modified = True
+            
+            return JsonResponse({'playlist_url': playlist_url})
+        
+        except SpotifyAPIError as e:
+            logger.error(f"Failed to create playlist: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)}, status=400)
+            
     except Exception as e:
         logger.error(f"Failed to create playlist: {str(e)}", exc_info=True)
         return JsonResponse({'error': str(e)}, status=400)
 
 def spotify_callback(request):
+    """Handle Spotify OAuth callback"""
     try:
         error = request.GET.get('error')
         if error:
             logger.error(f"Spotify auth error: {error}")
-            return JsonResponse({'error': f'Spotify auth error: {error}'}, status=400)
+            return render(request, 'converter/error.html', {
+                'error': f'Spotify auth error: {error}'
+            })
 
         code = request.GET.get('code')
         state = request.GET.get('state')
         stored_state = request.session.get('spotify_auth_state')
 
+        if not code:
+            raise Exception("No authorization code received")
+
         if not state or state != stored_state:
             logger.error("State mismatch in Spotify callback")
-            return JsonResponse({'error': 'State verification failed'}, status=400)
+            raise Exception("State verification failed")
 
-        # Exchange code for token
+        # Get access token using the code
         spotify = SpotifyAPI()
         token_data = spotify.get_token_from_code(code)
         
-        # Store token in session
-        request.session['spotify_token'] = token_data['access_token']
+        # Store tokens in session
+        request.session['spotify_access_token'] = token_data['access_token']
+        request.session['spotify_refresh_token'] = token_data['refresh_token']
+        request.session['spotify_token_expires_at'] = time.time() + token_data['expires_in']
+        
+        # Clear auth state
+        request.session.pop('spotify_auth_state', None)
         request.session.modified = True
         
-        logger.info("Successfully authenticated with Spotify")
-
-        # Get the pending playlist data
-        playlist_data = request.session.get('pending_playlist_data')
-        if playlist_data:
-            try:
-                # Create the playlist immediately
-                spotify = SpotifyAPI.from_token(token_data['access_token'])
-                playlist_url = spotify.create_playlist(
-                    name=playlist_data['playlist_name'],
-                    description=playlist_data.get('playlist_description', ''),
-                    track_ids=playlist_data['track_ids']
-                )
-                
-                # Clear session data
-                request.session.pop('pending_playlist_data', None)
-                request.session.modified = True
-                
-                # Redirect directly to the created playlist
-                return redirect(playlist_url)
-            except Exception as e:
-                logger.error(f"Failed to create playlist after auth: {str(e)}")
-                # If creation fails, go back to review page with error message
-                return render(request, 'converter/review_playlist.html', {
-                    **playlist_data,
-                    'auth_success': True,
-                    'error_message': str(e)
-                })
+        # Check if we have pending playlist data
+        pending_data = request.session.get('pending_playlist_data')
+        if pending_data:
+            # Clear pending data
+            request.session.pop('pending_playlist_data', None)
+            request.session.modified = True
+            # Redirect to review page
+            return redirect('converter:review_playlist')
         
-        # If we don't have playlist data, just go back to review page with success message
-        return render(request, 'converter/review_playlist.html', {
-            'auth_success': True
-        })
-
+        return redirect('converter:index')
+        
     except Exception as e:
-        logger.error(f"Spotify callback error: {str(e)}", exc_info=True)
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f"Spotify callback error: {str(e)}")
+        return render(request, 'converter/error.html', {
+            'error': f"Failed to authenticate with Spotify: {str(e)}"
+        })
 
 def clear_session_data(request):
     """Clear temporary session data after successful creation"""
@@ -329,3 +377,22 @@ def clear_session_data(request):
         if key in request.session:
             del request.session[key]
     request.session.modified = True
+
+@csrf_exempt
+@require_POST
+def create_apple_playlist(request):
+    try:
+        data = json.loads(request.body)
+        user_token = data.get('user_token')
+        playlist_name = data.get('playlist_name')
+        playlist_description = data.get('playlist_description')
+        track_ids = data.get('track_ids')
+        if not all([user_token, playlist_name, track_ids]):
+            return JsonResponse({'error': 'Missing required parameters'}, status=400)
+        api = AppleMusicAPI(user_token=user_token)
+        playlist_url = api.create_playlist(playlist_name, playlist_description, track_ids)
+        return JsonResponse({'playlist_url': playlist_url})
+    except AppleMusicAPIError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'Unexpected error: {str(e)}'}, status=500)

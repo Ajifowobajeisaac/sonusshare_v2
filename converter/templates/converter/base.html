@@ -13,8 +13,8 @@
     <header>
         <nav class="nav-left">
             <ul>
-                <li><a href="{% url 'index' %}">Home</a></li>
-                <li><a href="{% url 'about' %}">About</a></li>
+                <li><a href="{% url 'converter:index' %}">Home</a></li>
+                <li><a href="{% url 'converter:about' %}">About</a></li>
             </ul>
         </nav>
         
@@ -24,7 +24,7 @@
         
         <nav class="nav-right">
             <ul>
-                <li><a href="{% url 'contact' %}">Contact</a></li>
+                <li><a href="{% url 'converter:contact' %}">Contact</a></li>
                 <li><a href="#">Support</a></li>
             </ul>
         </nav>
@@ -35,7 +35,7 @@
           <div class="error-container">
             <h2>Oops! An error occurred.</h2>
             <p>{{ error_message }}</p>
-            <a href="{% url 'index' %}">Go back to the home page</a>
+            <a href="{% url 'converter:index' %}">Go back to the home page</a>
           </div>
         {% endblock %}
     </main>

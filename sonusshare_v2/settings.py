@@ -164,21 +164,29 @@ STATICFILES_DIRS = [
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Apple Music API Settings
-APPLE_TEAM_ID = os.environ.get('APPLE_TEAM_ID')
-APPLE_KEY_ID = os.environ.get('APPLE_KEY_ID')
+APPLE_TEAM_ID = os.environ.get('APPLE_MUSIC_TEAM_ID')
+APPLE_KEY_ID = os.environ.get('APPLE_MUSIC_KEY_ID')
 APPLE_PRIVATE_KEY = os.environ.get('APPLE_PRIVATE_KEY')
 APPLE_MUSIC_DEVELOPER_TOKEN = get_developer_token()  # from utils_apple_music
 
 # If private key is not in environment, try to load from file
 if not APPLE_PRIVATE_KEY:
     try:
-        key_path = os.path.join(BASE_DIR, 'converter', 'utilities', 'apple_auth_key.p8')
-        with open(key_path, 'r') as key_file:
-            APPLE_PRIVATE_KEY = key_file.read().strip()
+        # Try secure location first, then fall back to project directory
+        key_paths = [
+            os.path.expanduser('~/.sonusshare/keys/apple_auth_key.p8'),
+            os.path.join(BASE_DIR, 'converter', 'utilities', 'apple_auth_key.p8')
+        ]
+        
+        for key_path in key_paths:
+            if os.path.exists(key_path):
+                with open(key_path, 'r') as key_file:
+                    APPLE_PRIVATE_KEY = key_file.read().strip()
+                break
     except FileNotFoundError:
         APPLE_PRIVATE_KEY = None
 
 # Spotify API Settings
 SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID')
 SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
-SPOTIFY_REDIRECT_URI = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://127.0.0.1:8000/tests/callback/spotify/')
+SPOTIFY_REDIRECT_URI = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://127.0.0.1:8000/callback/')

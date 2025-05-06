@@ -8,6 +8,7 @@ from spotipy.oauth2 import SpotifyOAuth
 from spotipy.oauth2 import SpotifyClientCredentials
 import requests
 import base64
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,8 @@ class SpotifyAPI:
         self.client_secret = settings.SPOTIFY_CLIENT_SECRET
         self.redirect_uri = settings.SPOTIFY_REDIRECT_URI
         self.token = None
+        self.refresh_token = None
+        self.token_expires_at = None
         
         if not all([self.client_id, self.client_secret, self.redirect_uri]):
             raise SpotifyAPIError("Missing Spotify credentials in settings")
@@ -40,17 +43,96 @@ class SpotifyAPI:
         self.sp = spotipy.Spotify(auth_manager=self.client_credentials_manager)
     
     @classmethod
-    def from_user_token(cls, access_token):
-        """Create instance with user token instead of client credentials"""
+    def from_token(cls, token, refresh_token=None, expires_in=None):
+        """Create instance with user token and verify connection"""
         instance = cls()
-        instance.sp = spotipy.Spotify(auth=access_token)
+        instance.token = token
+        instance.refresh_token = refresh_token
+        if expires_in:
+            instance.token_expires_at = time.time() + expires_in
+        # Initialize proper auth manager
+        instance.sp = spotipy.Spotify(auth=token)
+        
+        # Verify token is valid
+        try:
+            instance.sp.me()
+        except Exception as e:
+            logger.error(f"Invalid token provided: {str(e)}")
+            raise SpotifyAPIError("Invalid token provided")
+        
         return instance
-    
-    @property
-    def access_token(self):
-        """Get the current access token from the client credentials manager"""
-        return self.client_credentials_manager.get_access_token()['access_token']
-    
+
+    def refresh_access_token(self):
+        """Refresh the access token using the refresh token"""
+        if not self.refresh_token:
+            raise SpotifyAPIError("No refresh token available")
+
+        auth_header = base64.b64encode(
+            f"{self.client_id}:{self.client_secret}".encode()
+        ).decode()
+
+        headers = {
+            'Authorization': f'Basic {auth_header}',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+
+        data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': self.refresh_token
+        }
+
+        try:
+            response = requests.post(
+                self.TOKEN_URL,
+                headers=headers,
+                data=data
+            )
+            response.raise_for_status()
+            token_data = response.json()
+            
+            self.token = token_data['access_token']
+            if 'refresh_token' in token_data:
+                self.refresh_token = token_data['refresh_token']
+            self.token_expires_at = time.time() + token_data['expires_in']
+            
+            # Update spotipy client with new token
+            self.sp = spotipy.Spotify(auth=self.token)
+            
+            # Verify new token works
+            self.sp.me()
+            
+            logger.info("Successfully refreshed access token")
+            return token_data
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to refresh token: {str(e)}")
+            raise SpotifyAPIError(f"Failed to refresh Spotify access token: {str(e)}")
+        except Exception as e:
+            logger.error(f"Failed to verify refreshed token: {str(e)}")
+            raise SpotifyAPIError(f"Failed to verify refreshed token: {str(e)}")
+
+    def _ensure_valid_token(self):
+        """Ensure we have a valid access token, refreshing if necessary"""
+        try:
+            # Check if token is expired or about to expire (within 5 minutes)
+            if not self.token or not self.token_expires_at or time.time() > (self.token_expires_at - 300):
+                if self.refresh_token:
+                    logger.info("Token expired or about to expire, refreshing...")
+                    self.refresh_access_token()
+                else:
+                    raise SpotifyAPIError("No valid token available")
+                
+            # Verify token is still valid
+            self.sp.me()
+            
+        except Exception as e:
+            logger.error(f"Token validation failed: {str(e)}")
+            if self.refresh_token:
+                logger.info("Attempting token refresh...")
+                self.refresh_access_token()
+            else:
+                raise SpotifyAPIError("No valid token available")
+
     def search_track(self, track_name, artist_name):
         try:
             query = f"track:{track_name} artist:{artist_name}"
@@ -90,18 +172,27 @@ class SpotifyAPI:
             )
             response.raise_for_status()
             token_data = response.json()
+            
+            # Store tokens
+            self.token = token_data['access_token']
+            self.refresh_token = token_data['refresh_token']
+            self.token_expires_at = time.time() + token_data['expires_in']
+            
+            # Update spotipy client
+            self.sp = spotipy.Spotify(auth=self.token)
+            
             return token_data
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to get token from code: {str(e)}")
-            raise Exception(f"Failed to get Spotify access token: {str(e)}")
+            raise SpotifyAPIError(f"Failed to get Spotify access token: {str(e)}")
 
     def create_playlist(self, name, description, track_ids):
         """Create a playlist and add tracks to it"""
-        if not self.token:
-            raise Exception("No access token available")
-
         try:
+            # Ensure we have a valid token
+            self._ensure_valid_token()
+            
             # Get user ID using spotipy client
             user_response = self.sp.me()
             user_id = user_response['id']
@@ -120,7 +211,7 @@ class SpotifyAPI:
 
         except spotipy.exceptions.SpotifyException as e:
             logger.error(f"Failed to create playlist: {str(e)}")
-            raise Exception(f"Failed to create Spotify playlist: {str(e)}")
+            raise SpotifyAPIError(f"Failed to create Spotify playlist: {str(e)}")
 
     def get_auth_url(self):
         """Generate the Spotify authorization URL"""
@@ -146,15 +237,6 @@ class SpotifyAPI:
         )
         
         return auth_manager.get_access_token(auth_code)
-
-    @classmethod
-    def from_token(cls, token):
-        """Create instance with user token and verify connection"""
-        instance = cls()
-        instance.token = token
-        # Initialize propper auth manager
-        instance.sp = spotipy.Spotify(auth=token)
-        return instance
 
     def get_playlist(self, playlist_id):
         """Get a playlist by ID"""
@@ -196,7 +278,7 @@ def create_spotify_playlist(request):
 
         try:
             # Use SpotifyAPI class instead of direct spotipy usage
-            spotify = SpotifyAPI.from_user_token(access_token)
+            spotify = SpotifyAPI.from_token(access_token)
             playlist_url = spotify.create_playlist(name, description, track_ids)
             
             return render(request, 'sonoshareapp/playlist_created.html', {

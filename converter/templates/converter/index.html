@@ -150,7 +150,7 @@
     </div>
 
     <div class="input-container">
-        <form method="post" action="{% url 'convert_playlist' %}">
+        <form method="post" action="{% url 'converter:convert_playlist' %}">
             {% csrf_token %}
             <input type="text" name="playlist_url" id="playlist-url" placeholder="Paste your playlist link here" required>
             <select name="destination" id="destination-platform" required>
@@ -185,7 +185,7 @@
     </div>
 
     <!-- Hidden form for featured playlist conversion -->
-    <form id="featured-playlist-form" method="post" action="{% url 'convert_playlist' %}" style="display: none;">
+    <form id="featured-playlist-form" method="post" action="{% url 'converter:convert_playlist' %}" style="display: none;">
         {% csrf_token %}
         <input type="hidden" name="playlist_url" id="featured-playlist-url">
         <input type="hidden" name="destination" value="spotify">

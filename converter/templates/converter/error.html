@@ -1,0 +1,59 @@
+{% extends 'converter/base.html' %}
+{% load static %}
+
+{% block title %}Error - SonusShare{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .error-container {
+        max-width: 600px;
+        margin: 4rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    .error-icon {
+        font-size: 4rem;
+        color: #dc2626;
+        margin-bottom: 1rem;
+    }
+
+    .error-title {
+        font-size: 1.5rem;
+        color: #1f2937;
+        margin-bottom: 1rem;
+    }
+
+    .error-message {
+        color: #4b5563;
+        margin-bottom: 2rem;
+        line-height: 1.5;
+    }
+
+    .back-button {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background: #333;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: background-color 0.3s ease;
+    }
+
+    .back-button:hover {
+        background: #444;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="error-container">
+    <div class="error-icon">⚠️</div>
+    <h1 class="error-title">Oops! Something went wrong</h1>
+    <p class="error-message">{{ error }}</p>
+    <a href="/" class="back-button">Back to Home</a>
+</div>
+{% endblock %} 

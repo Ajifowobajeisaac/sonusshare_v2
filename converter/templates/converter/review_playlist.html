@@ -357,7 +357,8 @@
             <label for="select-all">Select All Songs</label>
         </div>
 
-        <form id="convert-form" method="post" action="{% url 'create_playlist' %}">
+        {% if platform == 'spotify' %}
+        <form id="convert-form" method="post" action="{% url 'converter:create_playlist' %}">
             {% csrf_token %}
             <input type="hidden" name="playlist_url" value="{{ playlist_url }}">
             <input type="hidden" name="source_platform" value="{{ source_platform }}">
@@ -385,11 +386,46 @@
                     {% endfor %}
                 </tbody>
             </table>
-
             <button type="submit" class="convert-button">
                 Convert Selected Songs to Spotify
             </button>
         </form>
+        {% elif platform == 'apple_music' %}
+        <form id="convert-form-apple" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="playlist_url" value="{{ playlist_url }}">
+            <input type="hidden" name="source_platform" value="{{ source_platform }}">
+            <input type="hidden" id="playlist_name" value="{{ playlist_name }}">
+            <input type="hidden" id="playlist_description" value="{{ playlist_description }}">
+            <table class="song-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px">Select</th>
+                        <th>Track Name</th>
+                        <th>Artist</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for track in tracks %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" 
+                                   name="selected_tracks" 
+                                   value="{{ track.id }}"
+                                   class="song-checkbox"
+                                   checked>
+                        </td>
+                        <td>{{ track.name }}</td>
+                        <td>{{ track.artist }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="button" class="convert-button" id="apple-create-btn">
+                Convert Selected Songs to Apple Music
+            </button>
+        </form>
+        {% endif %}
         {% endif %}
     </div>
 
@@ -418,50 +454,110 @@
             });
         }
 
-        // Form submission
-        const form = document.getElementById('convert-form');
-        if (form) {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const selectedTracks = Array.from(songCheckboxes)
-                    .filter(cb => cb.checked)
-                    .map(cb => parseInt(cb.value));
-
-                if (selectedTracks.length === 0) {
-                    alert('Please select at least one song to convert');
-                    return;
-                }
-
-                try {
-                    const response = await fetch('{% url "create_playlist" %}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        },
-                        body: JSON.stringify({
-                            playlist_url: '{{ playlist_url }}',
-                            source_platform: '{{ source_platform }}',
-                            selected_tracks: selectedTracks,
-                            platform: 'spotify'
-                        })
-                    });
-
-                    const data = await response.json();
-                    
-                    if (data.auth_url) {
-                        window.location.href = data.auth_url;
-                    } else if (data.playlist_url) {
-                        window.location.href = data.playlist_url;
-                    } else if (data.error) {
-                        throw new Error(data.error);
+        // JS: Only run the relevant logic for the selected platform
+        const platform = '{{ platform }}';
+        if (platform === 'spotify') {
+            // ... existing Spotify JS for form submission ...
+            const form = document.getElementById('convert-form');
+            if (form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const selectedTracks = Array.from(document.querySelectorAll('input[name="selected_tracks"]'))
+                        .filter(cb => cb.checked)
+                        .map(cb => parseInt(cb.value));
+                    if (selectedTracks.length === 0) {
+                        alert('Please select at least one song to convert');
+                        return;
                     }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Failed to create playlist: ' + error.message);
-                }
+                    try {
+                        const response = await fetch('{% url "converter:create_playlist" %}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': '{{ csrf_token }}'
+                            },
+                            body: JSON.stringify({
+                                playlist_url: '{{ playlist_url }}',
+                                source_platform: '{{ source_platform }}',
+                                selected_tracks: selectedTracks,
+                                platform: 'spotify'
+                            })
+                        });
+                        const data = await response.json();
+                        if (data.auth_url) {
+                            window.location.href = data.auth_url;
+                        } else if (data.playlist_url) {
+                            window.location.href = data.playlist_url;
+                        } else if (data.error) {
+                            throw new Error(data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Failed to create playlist: ' + error.message);
+                    }
+                });
+            }
+        } else if (platform === 'apple_music') {
+            let musicKitReady = false;
+            let musicInstance = null;
+            document.addEventListener('musickitloaded', async function() {
+                await MusicKit.configure({
+                    developerToken: '{{ developer_token }}',
+                    app: { name: 'SonusShare', build: '1.0.0' }
+                });
+                musicInstance = MusicKit.getInstance();
+                musicKitReady = true;
             });
+            const appleBtn = document.getElementById('apple-create-btn');
+            if (appleBtn) {
+                appleBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    if (!musicKitReady || !musicInstance) {
+                        alert('Apple Music is still loading. Please wait a moment and try again.');
+                        return;
+                    }
+                    const selectedTracks = Array.from(document.querySelectorAll('input[name="selected_tracks"]'))
+                        .filter(cb => cb.checked)
+                        .map(cb => cb.value);
+                    if (selectedTracks.length === 0) {
+                        alert('Please select at least one song to convert');
+                        return;
+                    }
+                    try {
+                        await musicInstance.authorize();
+                        const userToken = musicInstance.musicUserToken;
+                        if (!userToken) {
+                            alert('Failed to get Apple Music user token.');
+                            return;
+                        }
+                        // Gather playlist info
+                        const playlistName = document.getElementById('playlist_name').value;
+                        const playlistDescription = document.getElementById('playlist_description').value;
+                        // Send to backend
+                        const response = await fetch('{% url "converter:create_apple_playlist" %}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': '{{ csrf_token }}'
+                            },
+                            body: JSON.stringify({
+                                playlist_name: playlistName,
+                                playlist_description: playlistDescription,
+                                track_ids: selectedTracks,
+                                user_token: userToken
+                            })
+                        });
+                        const data = await response.json();
+                        if (data.playlist_url) {
+                            window.location.href = data.playlist_url;
+                        } else if (data.error) {
+                            alert('Failed to create Apple Music playlist: ' + data.error);
+                        }
+                    } catch (error) {
+                        alert('Apple Music playlist creation failed: ' + error.message);
+                    }
+                });
+            }
         }
     </script>
 {% endblock %}

@@ -183,7 +183,7 @@
                     console.log('User token obtained:', userToken ? 'Yes' : 'No');
 
                     console.log('Making playlist creation request...');
-                    const response = await fetch('{% url "create_playlist" %}', {
+                    const response = await fetch('{% url "converter:create_playlist" %}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -215,7 +215,7 @@
                 }
             } else {
                 // Existing Spotify logic
-                fetch('{% url "create_playlist" %}', {
+                fetch('{% url "converter:create_playlist" %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',

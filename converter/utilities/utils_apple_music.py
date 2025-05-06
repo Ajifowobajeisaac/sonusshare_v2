@@ -49,71 +49,57 @@ def generate_token_using_node():
 
 @lru_cache(maxsize=1)
 def get_developer_token():
-    """Generate an Apple Music developer token"""
+    """
+    Get the Apple Music developer token from environment variables.
+    If not found, generate a new one using the private key.
+    """
     try:
-        # Try generating token using Node.js first
-        try:
-            token = generate_token_using_node()
-            logger.info("Successfully got token from Node.js script")
-            
-            # Test the token
-            test_url = "https://api.music.apple.com/v1/catalog/us/songs/203709340"
-            test_headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json"
-            }
-            
-            logger.debug(f"Testing token with URL: {test_url}")
-            response = requests.get(test_url, headers=test_headers)
-            
-            if response.status_code == 200:
-                logger.info("Token validated successfully with Apple Music API")
-                return token
-            else:
-                logger.warning(f"Node.js token validation failed with status {response.status_code}")
-                # Continue with Python implementation
-        except Exception as node_error:
-            logger.warning(f"Node.js token generation failed, falling back to Python: {str(node_error)}")
+        # First try to get the token from environment variables
+        token = os.getenv('APPLE_MUSIC_DEVELOPER_TOKEN')
+        if token:
+            return token
 
-        # Continue with Python implementation
-        logger.info("Using Python token generation")
+        # If no token in env, generate a new one
+        key_id = os.getenv('APPLE_MUSIC_KEY_ID')
+        team_id = os.getenv('APPLE_MUSIC_TEAM_ID')
         
-        # Get credentials from settings
-        team_id = settings.APPLE_TEAM_ID
-        key_id = settings.APPLE_KEY_ID
-
-        if not team_id or not key_id:
-            raise ValueError(f"Missing required credentials: team_id={bool(team_id)}, key_id={bool(key_id)}")
-
-        # Load private key
-        key_path = Path(__file__).parent / 'apple_auth_key.p8'
-        logger.info(f"Looking for private key at: {key_path}")
+        # Look for private key in secure location first, then fall back to project directory
+        private_key_paths = [
+            os.path.expanduser('~/.sonusshare/keys/apple_auth_key.p8'),
+            os.path.join(os.path.dirname(__file__), 'apple_auth_key.p8')
+        ]
         
-        if not key_path.exists():
-            raise FileNotFoundError(f"Apple Music private key not found at {key_path}")
-            
-        with open(key_path, 'r') as key_file:
+        private_key_path = None
+        for path in private_key_paths:
+            if os.path.exists(path):
+                private_key_path = path
+                break
+                
+        if not private_key_path:
+            raise AppleMusicAPIError("Private key file not found in any of the expected locations")
+
+        if not all([key_id, team_id]):
+            raise AppleMusicAPIError("Missing required credentials: team_id={}, key_id={}".format(
+                bool(team_id), bool(key_id)
+            ))
+
+        # Read the private key
+        with open(private_key_path, 'r') as key_file:
             private_key = key_file.read()
 
-        # Validate and clean private key
-        if not private_key.strip():
-            raise ValueError("Private key file is empty")
-            
-        private_key = clean_private_key(private_key)
-        
-        # Generate token with same parameters as Node.js script
-        now = int(time.time())
-        payload = {
-            'iss': team_id,
-            'iat': now,
-            'exp': now + (60 * 60 * 24 * 180),  # 180 days
-        }
-        
+        # Generate the token
         headers = {
             'alg': 'ES256',
             'kid': key_id
         }
-        
+
+        payload = {
+            'iss': team_id,
+            'iat': int(time.time()),
+            'exp': int(time.time() + 15777000)  # 6 months from now
+        }
+
+        # Generate the token
         token = jwt.encode(
             payload,
             private_key,
@@ -121,21 +107,11 @@ def get_developer_token():
             headers=headers
         )
 
-        # Test the token
-        test_url = "https://api.music.apple.com/v1/catalog/us/songs/203709340"
-        test_headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-        
-        response = requests.get(test_url, headers=test_headers)
-        if response.status_code != 200:
-            raise AppleMusicAPIError(f"Token validation failed (HTTP {response.status_code}): {response.text}")
-
+        # Set the token in environment variables for future use
+        os.environ['APPLE_MUSIC_DEVELOPER_TOKEN'] = token
         return token
 
     except Exception as e:
-        logger.error(f"Developer token generation failed: {str(e)}", exc_info=True)
         raise AppleMusicAPIError(f"Token generation failed: {str(e)}")
 
 class AppleMusicAPI:
@@ -143,8 +119,8 @@ class AppleMusicAPI:
     
     BASE_URL = "https://api.music.apple.com/v1"
     
-    def __init__(self, user_token=None):
-        self.developer_token = get_developer_token()
+    def __init__(self, user_token=None, developer_token=None):
+        self.developer_token = developer_token or get_developer_token()
         self.user_token = user_token
         self.headers = {
             'Authorization': f'Bearer {self.developer_token}',

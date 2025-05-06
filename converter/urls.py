@@ -1,12 +1,16 @@
 from django.urls import path
 from . import views
 
+app_name = 'converter'
+
 urlpatterns = [
     path('', views.index, name='index'),
-    path('convert_playlist/', views.convert_playlist, name='convert_playlist'),
-    path('review_playlist/', views.review_playlist, name='review_playlist'),
     path('about/', views.about, name='about'),
     path('contact/', views.contact, name='contact'),
-    path('create_playlist/', views.create_playlist, name='create_playlist'),
+    path('convert/', views.convert_playlist, name='convert_playlist'),
+    path('review/', views.review_playlist, name='review_playlist'),
+    path('create/', views.create_playlist, name='create_playlist'),
+    path('create-apple-playlist/', views.create_apple_playlist, name='create_apple_playlist'),
     path('callback/', views.spotify_callback, name='spotify_callback'),
+    path('clear-session/', views.clear_session_data, name='clear_session'),
 ]
