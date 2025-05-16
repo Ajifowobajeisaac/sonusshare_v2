@@ -1,6 +1,7 @@
 # views.py
 
 from django.http import JsonResponse
+from django.template.loader import render_to_string
 from django.shortcuts import render, redirect
 import logging
 import json
@@ -13,7 +14,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.conf import settings
 import secrets
 from urllib.parse import urlencode
-import base64
+
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -239,7 +240,11 @@ def convert_playlist(request):
         logger.info("Stored playlist data in session")
         logger.info(f"Session keys: {request.session.keys()}")
         
-        return render(request, 'converter/review_playlist.html', context)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            html = render_to_string('converter/review_playlist.html', context)
+            return JsonResponse({'html': html})
+        else:
+            return render(request, 'converter/review_playlist.html', context)
         
     except Exception as e:
         logger.error(f"Conversion failed: {str(e)}", exc_info=True)
@@ -262,7 +267,7 @@ def generate_spotify_auth_url():
 
 @ensure_csrf_cookie
 @require_http_methods(["POST"])
-def create_playlist(request):
+def create_spotify_playlist(request):
     try:
         playlist_data = request.session.get('playlist_data')
         if not playlist_data:
@@ -382,7 +387,9 @@ def clear_session_data(request):
 @require_POST
 def create_apple_playlist(request):
     try:
+        print('create_apple_playlist function runs')
         data = json.loads(request.body)
+        print('data is', data)
         user_token = data.get('user_token')
         playlist_name = data.get('playlist_name')
         playlist_description = data.get('playlist_description')
@@ -390,6 +397,8 @@ def create_apple_playlist(request):
         if not all([user_token, playlist_name, track_ids]):
             return JsonResponse({'error': 'Missing required parameters'}, status=400)
         api = AppleMusicAPI(user_token=user_token)
+        print('api is', api)
+        print('playlist_name is', playlist_name)
         playlist_url = api.create_playlist(playlist_name, playlist_description, track_ids)
         return JsonResponse({'playlist_url': playlist_url})
     except AppleMusicAPIError as e:

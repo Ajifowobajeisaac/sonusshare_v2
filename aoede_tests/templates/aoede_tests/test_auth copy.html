@@ -521,12 +521,6 @@
                     name: 'SonusShare',
                 }
             });
-            if (musicKitInstance) {
-                console.log('MusicKit initialized successfully');
-            }
-            else {
-                console.log('MusicKit failed to initialize');
-            }
 
             addAppleLog('MusicKit initialized successfully', 'success', {
                 version: MusicKit.version,
@@ -632,11 +626,5 @@
 
     // Initialize MusicKit when the page loads
     document.addEventListener('musickitloaded', initializeMusicKit);
-    if (!musicKitInstance) {
-    console.log('Apple Music is not ready yet. Please try again in a moment.');
-    }
-    else {
-        console.log('Apple Music is ready.');
-    }
 </script>
 {% endblock %} 

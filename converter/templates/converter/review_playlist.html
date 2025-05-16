@@ -143,188 +143,9 @@
 </style>
 {% endblock %}
 
-{% block extra_head %}
-<!-- Load MusicKit script -->
-<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" data-web-components async></script>
-
-<script>
-    // Logging utility
-    function addLog(message, type = 'info', details = null) {
-        const timestamp = new Date().toLocaleTimeString();
-        console.log(`[${timestamp}][${type.toUpperCase()}] ${message}`);
-        if (details) {
-            console.log('Details:', details);
-        }
-    }
-
-    // Function to show error messages
-    function showErrorMessage(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'message error-message';
-        errorDiv.textContent = message;
-        const container = document.querySelector('.review-container');
-        container.insertBefore(errorDiv, container.firstChild);
-        addLog(message, 'error');
-    }
-
-    // Function to update artwork
-    async function updatePlaylistArtwork(playlistId) {
-        try {
-            addLog('Fetching playlist artwork...', 'info', { playlistId });
-            
-            const response = await fetch(
-                `https://api.music.apple.com/v1/catalog/gb/playlists/${playlistId}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer {{ developer_token }}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            addLog('Received playlist data', 'info', {
-                hasData: Boolean(data.data),
-                dataLength: data.data?.length,
-                hasAttributes: Boolean(data.data?.[0]?.attributes)
-            });
-
-            if (data.data?.[0]?.attributes?.artwork) {
-                const artwork = data.data[0].attributes.artwork;
-                addLog('Raw artwork data', 'info', artwork);
-
-                const artworkUrl = MusicKit.formatArtworkURL(artwork, 600, 600);
-                addLog('Formatted artwork URL', 'info', {
-                    original: artwork.url,
-                    formatted: artworkUrl
-                });
-
-                // Update the artwork container
-                const container = document.getElementById('playlist-artwork');
-                if (container) {
-                    container.innerHTML = `
-                        <img src="${artworkUrl}" 
-                             alt="{{ playlist_name }}" 
-                             class="playlist-artwork"
-                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'playlist-artwork-placeholder\'><span>{{ playlist_name|slice:":1" }}</span></div>'; addLog('Failed to load artwork', 'error');"
-                             onload="addLog('Successfully loaded artwork', 'success');">
-                    `;
-                    addLog('Updated artwork container', 'success');
-                } else {
-                    throw new Error('Artwork container not found');
-                }
-            } else {
-                throw new Error('No artwork found in playlist data');
-            }
-        } catch (error) {
-            addLog('Failed to update artwork', 'error', {
-                error: error.message,
-                stack: error.stack
-            });
-            showErrorMessage('Failed to load playlist artwork');
-            
-            // Show placeholder on error
-            const container = document.getElementById('playlist-artwork');
-            if (container) {
-                container.innerHTML = `
-                    <div class="playlist-artwork-placeholder">
-                        <span>{{ playlist_name|slice:":1" }}</span>
-                    </div>
-                `;
-            }
-        }
-    }
-
-    // Initialize MusicKit and load artwork
-    document.addEventListener('DOMContentLoaded', async function() {
-        try {
-            addLog('Waiting for MusicKit to load...');
-            
-            // Wait for MusicKit to be available
-            if (typeof MusicKit === 'undefined') {
-                document.addEventListener('musickitloaded', initializeMusicKit);
-                addLog('Added musickitloaded event listener');
-            } else {
-                await initializeMusicKit();
-            }
-        } catch (error) {
-            addLog('Error in DOMContentLoaded handler', 'error', {
-                error: error.message,
-                stack: error.stack
-            });
-        }
-    });
-
-    // Initialize MusicKit
-    async function initializeMusicKit() {
-        try {
-            addLog('Initializing MusicKit...');
-            
-            const music = await MusicKit.configure({
-                developerToken: '{{ developer_token }}',
-                app: {
-                    name: 'SonusShare',
-                    build: '1.0.0'
-                }
-            });
-
-            addLog('MusicKit initialized successfully', 'success', {
-                version: MusicKit.version,
-                hasToken: Boolean('{{ developer_token }}')
-            });
-
-            // Check if we should fetch artwork
-            const sourcePlatform = '{{ source_platform }}';
-            const playlistId = '{{ playlist_id }}';
-            
-            addLog('Checking playlist details', 'info', {
-                sourcePlatform,
-                playlistId
-            });
-
-            if (sourcePlatform === 'apple_music' && playlistId) {
-                await updatePlaylistArtwork(playlistId);
-            } else {
-                addLog('Skipping artwork update - not an Apple Music playlist', 'info');
-            }
-        } catch (error) {
-            addLog('MusicKit initialization failed', 'error', {
-                error: error.message,
-                stack: error.stack
-            });
-            showErrorMessage('Failed to initialize Apple Music. Please try again.');
-        }
-    }
-</script>
-{% endblock %}
-
 {% block content %}
-    <script>
-        console.log('Checking developer token on page load:', {
-            tokenExists: Boolean('{{ developer_token }}'),
-            tokenLength: '{{ developer_token }}'.length,
-            tokenFirstChars: '{{ developer_token }}'.substring(0, 10),
-            rawToken: '{{ developer_token }}'
-        });
-    </script>
 
     <div class="review-container">
-        {% if auth_success %}
-        <div class="message success-message">
-            Successfully authenticated with Spotify! Creating your playlist...
-        </div>
-        <script>
-            // Automatically trigger playlist creation after successful auth
-            document.addEventListener('DOMContentLoaded', function() {
-                createPlaylist();
-            });
-        </script>
-        {% endif %}
 
         {% if error_message %}
         <div class="message error-message">
@@ -358,7 +179,18 @@
         </div>
 
         {% if platform == 'spotify' %}
-        <form id="convert-form" method="post" action="{% url 'converter:create_playlist' %}">
+        {% if auth_success %}
+        <div class="message success-message">
+            Successfully authenticated with Spotify! Creating your playlist...
+        </div>
+        <script>
+            // Automatically trigger playlist creation after successful auth
+            document.addEventListener('DOMContentLoaded', function() {
+                createPlaylist();
+            });
+        </script>
+        {% endif %}
+        <form id="convert-form" method="post" action="{% url 'converter:create_spotify_playlist' %}">
             {% csrf_token %}
             <input type="hidden" name="playlist_url" value="{{ playlist_url }}">
             <input type="hidden" name="source_platform" value="{{ source_platform }}">
@@ -391,6 +223,14 @@
             </button>
         </form>
         {% elif platform == 'apple_music' %}
+        <script>
+            console.log('Checking developer token on page load:', {
+                tokenExists: Boolean('{{ developer_token }}'),
+                tokenLength: '{{ developer_token }}'.length,
+                tokenFirstChars: '{{ developer_token }}'.substring(0, 10),
+                rawToken: '{{ developer_token }}'
+            });
+        </script>
         <form id="convert-form-apple" method="post">
             {% csrf_token %}
             <input type="hidden" name="playlist_url" value="{{ playlist_url }}">
@@ -428,7 +268,7 @@
         {% endif %}
         {% endif %}
     </div>
-
+    <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" data-web-components async></script>
     <script>
         // Select all functionality
         const selectAllCheckbox = document.getElementById('select-all');
@@ -470,7 +310,7 @@
                         return;
                     }
                     try {
-                        const response = await fetch('{% url "converter:create_playlist" %}', {
+                        const response = await fetch('{% url "converter:create_spotify_playlist" %}', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -498,42 +338,73 @@
                 });
             }
         } else if (platform === 'apple_music') {
-            let musicKitReady = false;
-            let musicInstance = null;
-            document.addEventListener('musickitloaded', async function() {
-                await MusicKit.configure({
-                    developerToken: '{{ developer_token }}',
-                    app: { name: 'SonusShare', build: '1.0.0' }
-                });
-                musicInstance = MusicKit.getInstance();
-                musicKitReady = true;
-            });
+            const APPLE_DEV_TOKEN = '{{ developer_token }}';
+            let musicKitInstance = null;
+            let isAppleAuthorized = false;
             const appleBtn = document.getElementById('apple-create-btn');
+            if (appleBtn) appleBtn.disabled = true;
+
+            // Add log function for debugging (optional)
+            function addAppleLog(message, type = 'info', details = null) {
+                console.log(`[AppleMusic][${type}]`, message, details || '');
+            }
+            
+            // Initialize MusicKit when loaded
+            async function initializeMusicKit() {
+                try {
+                    if (!APPLE_DEV_TOKEN || APPLE_DEV_TOKEN === 'None') {
+                        throw new Error('Developer token is not available. Check your environment configuration.');
+                    }
+
+                    addAppleLog('Initializing MusicKit...', 'info');
+                    musicKitInstance = await MusicKit.configure({
+                        developerToken: APPLE_DEV_TOKEN,
+                        app: {
+                            name: 'SonusShare',
+                        }
+                    });
+                    addAppleLog('MusicKit initialized successfully', 'success', {
+                        version: MusicKit.version
+                    });
+                    if (appleBtn) appleBtn.disabled = false;
+
+                    // Listen for authorization changes
+                    musicKitInstance.addEventListener(MusicKit.Events.authorizationStatusDidChange, async () => {
+                        isAppleAuthorized = musicKitInstance.isAuthorized;
+                        addAppleLog('Authorization status changed', 'info', { isAppleAuthorized });
+                        updateAppleButtonState(isAppleAuthorized);
+                    });
+                } catch (error) {
+                    addAppleLog('Failed to initialize MusicKit', 'error', error.message);
+                    if (appleBtn) appleBtn.disabled = true;
+                    alert('Failed to initialize Apple Music: ' + error.message);
+                }
+            };
+            // Initialize MusicKit when the page loads
+            document.addEventListener('musickitloaded', initializeMusicKit); 
+
+            // Handle Apple Music playlist creation
             if (appleBtn) {
                 appleBtn.addEventListener('click', async (e) => {
                     e.preventDefault();
-                    if (!musicKitReady || !musicInstance) {
-                        alert('Apple Music is still loading. Please wait a moment and try again.');
-                        return;
-                    }
                     const selectedTracks = Array.from(document.querySelectorAll('input[name="selected_tracks"]'))
                         .filter(cb => cb.checked)
                         .map(cb => cb.value);
+
                     if (selectedTracks.length === 0) {
                         alert('Please select at least one song to convert');
                         return;
                     }
                     try {
-                        await musicInstance.authorize();
-                        const userToken = musicInstance.musicUserToken;
-                        if (!userToken) {
-                            alert('Failed to get Apple Music user token.');
-                            return;
-                        }
-                        // Gather playlist info
+                        addAppleLog('Requesting authorization...', 'info');
+                        await musicKitInstance.authorize();
+                        const userToken = await musicKitInstance.musicUserToken;
+                        addAppleLog('Authorization flow completed', 'success', { tokenReceived: !!userToken });
+                        if (!userToken) throw new Error('Failed to get Apple Music user token');
+
                         const playlistName = document.getElementById('playlist_name').value;
                         const playlistDescription = document.getElementById('playlist_description').value;
-                        // Send to backend
+
                         const response = await fetch('{% url "converter:create_apple_playlist" %}', {
                             method: 'POST',
                             headers: {
@@ -547,19 +418,26 @@
                                 user_token: userToken
                             })
                         });
+
                         const data = await response.json();
                         if (data.playlist_url) {
                             window.location.href = data.playlist_url;
                         } else if (data.error) {
-                            alert('Failed to create Apple Music playlist: ' + data.error);
+                            throw new Error(data.error);
                         }
                     } catch (error) {
-                        alert('Apple Music playlist creation failed: ' + error.message);
+                        addAppleLog('Apple Music playlist creation failed', 'error', error.message);
+                        alert('Failed to create Apple Music playlist: ' + error.message);
                     }
                 });
             }
+            
         }
+       
+    </script>
+    <script>
+        window.addEventListener('popstate', function() {
+            location.reload();
+        });
     </script>
 {% endblock %}
- 
- 
