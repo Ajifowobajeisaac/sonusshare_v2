@@ -383,7 +383,6 @@ def clear_session_data(request):
             del request.session[key]
     request.session.modified = True
 
-@csrf_exempt
 @require_POST
 def create_apple_playlist(request):
     try:
