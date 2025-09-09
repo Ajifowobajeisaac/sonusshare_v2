@@ -213,13 +213,6 @@
         </div>
     </div>
 
-    <!-- Hidden form for featured playlist conversion -->
-    <form id="featured-playlist-form" method="post" action="{% url 'converter:convert_playlist' %}" style="display: none;">
-        {% csrf_token %}
-        <input type="hidden" name="playlist_url" id="featured-playlist-url">
-        <input type="hidden" name="destination" value="spotify">
-    </form>
-
     {{ featured_playlists|json_script:"featured-playlists-data" }}
     <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" data-web-components async></script>
    
@@ -248,23 +241,31 @@
             }
         }
 
-        document.querySelector('form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            showLoadingBar(); 
-
-            const form = e.target;
-            const formData = new FormData(form);
-
-            const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
-
-            // Convert FormData to URL-encoded string for Django
-            const data = new URLSearchParams();
-            for (const pair of formData) {
-                data.append(pair[0], pair[1]);
+        // AJAX form submission handler
+        async function handleConvertSubmit(formOrData) {
+            showLoadingBar();
+            let data, csrfToken, actionUrl;
+            if (formOrData instanceof HTMLFormElement) {
+                const form = formOrData;
+                const formData = new FormData(form);
+                csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+                data = new URLSearchParams();
+                for (const pair of formData) {
+                    data.append(pair[0], pair[1]);
+                }
+                actionUrl = form.action;
+            } else {
+                // formOrData is an object: {playlist_url, destination}
+                data = new URLSearchParams();
+                data.append('playlist_url', formOrData.playlist_url);
+                data.append('destination', formOrData.destination);
+                // Get CSRF token from main form
+                const mainForm = document.querySelector('form');
+                csrfToken = mainForm.querySelector('[name=csrfmiddlewaretoken]').value;
+                actionUrl = mainForm.action;
             }
-
             try {
-                const response = await fetch(form.action, {
+                const response = await fetch(actionUrl, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': csrfToken,
@@ -273,63 +274,45 @@
                     },
                     body: data
                 });
-
                 if (!response.ok) {
                     throw new Error('Conversion request failed');
                 }
-
-                // console.log('Response received:', {
-                //     status: response.status,
-                //     contentType: response.headers.get('content-type'),
-                //     url: response.url
-                // });
-
                 const contentType = response.headers.get('content-type');
                 if (contentType && contentType.includes('application/json')) {
-                    console.log('Processing JSON response');
                     const result = await response.json();
-                    if (result.html) {
-                        // Swap the page content with the returned HTML
-                        document.open();
-                        document.write(result.html);
-                        document.close();
+                    if (result.success) {
+                        // Complete the loading bar first
+                        completeLoadingBar();
+                        // Then redirect to the review page
+                        window.location.href = "{% url 'converter:review_playlist' %}";
                     } else if (result.error) {
                         alert(result.error);
                         completeLoadingBar();
                     }
                 } else {
-                    console.log('Processing HTML response');
-                    const html = await response.text();
-                    console.log('HTML received, length:', html.length);
-                    
-                    try {
-                        // Update URL for history/back button support
-                        history.pushState({}, '', '/review-playlist/');
-                        console.log('URL updated');
-                        
-                        // Replace the current content with the new HTML
-                        document.open();
-                        console.log('Document opened');
-                        document.write(html);
-                        console.log('HTML written');
-                        document.close();
-                        console.log('Document closed');
-                    } catch (transitionError) {
-                        console.error('Error during page transition:', transitionError);
-                        alert('Error loading the review page. Please try again.');
-                        completeLoadingBar();
-                    }
+                    // Complete the loading bar first
+                    completeLoadingBar();
+                    // Then redirect to the review page
+                    window.location.href = "{% url 'converter:review_playlist' %}";
                 }
             } catch (error) {
-                console.error('Fetch or processing error:', error);
                 alert('An error occurred: ' + error.message);
                 completeLoadingBar();
             }
+        }
+
+        // Main form AJAX submit
+        document.querySelector('form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleConvertSubmit(e.target);
         });
 
+        // Featured playlist AJAX click handler
         function convertFeaturedPlaylist(playlistUrl) {
-            document.getElementById('featured-playlist-url').value = playlistUrl;
-            document.getElementById('featured-playlist-form').submit();
+            handleConvertSubmit({
+                playlist_url: playlistUrl,
+                destination: 'spotify'
+            });
         }
 
         // Logging utility

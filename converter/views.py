@@ -241,8 +241,8 @@ def convert_playlist(request):
         logger.info(f"Session keys: {request.session.keys()}")
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            html = render_to_string('converter/review_playlist.html', context)
-            return JsonResponse({'html': html})
+            # For AJAX requests, return success - frontend will redirect
+            return JsonResponse({'success': True})
         else:
             return render(request, 'converter/review_playlist.html', context)
         
